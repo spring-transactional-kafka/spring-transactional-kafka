@@ -27,17 +27,7 @@ public class OutboxEvent {
         );
     }
 
-    public void markFailed() {
-        this.status = OutboxEventStatus.FAILED;
-    }
 
-    public void markPublished() {
-        this.status = OutboxEventStatus.PUBLISHED;
-    }
-
-    public void setId(Long id)  {
-        this.id = id;
-    }
     public Long getId() { return id; }
     public String getTopic() { return topic; }
     public String getKey() { return key; }
