@@ -1,4 +1,4 @@
-package io.github.springtxnkafka.sync;
+package io.github.springtxnkafka.producer;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
