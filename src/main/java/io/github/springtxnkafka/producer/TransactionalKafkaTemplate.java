@@ -9,7 +9,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class TransactionalKafkaTemplate<K, V> {
 
