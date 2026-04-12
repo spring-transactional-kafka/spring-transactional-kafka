@@ -35,49 +35,38 @@ There is no atomicity guarantee between the two. A crash, network blip, or broke
 
 ## What about Spring Kafka's transaction-aware sending?
 
-Spring Kafka's `KafkaTemplate` actually does detect an active `DataSourceTransactionManager` or `JpaTransactionManager` transaction via `TransactionSynchronizationManager` and defers the send until `afterCommit()`. If the transaction rolls back, the send is discarded.
+Spring Kafka's `KafkaTemplate` does detect an active `DataSourceTransactionManager` or `JpaTransactionManager` transaction via `TransactionSynchronizationManager` and defers the send until `afterCommit()`. If the transaction rolls back, the send is discarded.
 
-This sounds like exactly what you want. The problem is that **this behavior only activates under a specific set of conditions that are easy to get wrong**:
+So Spring does provide this out of the box — but whether it actually kicks in depends on three conditions that are easy to get wrong silently:
 
-**1. The `ProducerFactory` must be configured as transactional**
+**1. `spring.kafka.producer.transaction-id-prefix` must NOT be set**
 
-```java
-@Bean
-public ProducerFactory<String, String> producerFactory() {
-    DefaultKafkaProducerFactory<String, String> factory =
-        new DefaultKafkaProducerFactory<>(props);
-    factory.setTransactionIdPrefix("my-app-"); // required — without this, no deferral
-    return factory;
-}
-```
-
-Without `transactionIdPrefix`, `KafkaTemplate.send()` publishes immediately regardless of any active DB transaction. There is no warning, no exception — it silently bypasses the deferral behavior.
-
-**2. This drags in Kafka producer transactions whether you want them or not**
-
-Configuring a `transactionIdPrefix` enables Kafka's idempotent producer and transaction protocol on the broker side. This has real operational implications: it requires `IDEMPOTENT_WRITE` ACLs, affects producer performance, and means your broker must support transactions. You may not want or need any of this — you just wanted to not publish on rollback.
-
-**3. The interaction with `KafkaTransactionManager` is non-obvious**
-
-If you also have a `KafkaTransactionManager` in your context, Spring may attempt to synchronize Kafka transactions with your DB transaction using a chained approach. Chained transaction managers are not true two-phase commit — they commit each resource sequentially:
+This is the most counterintuitive one. Setting `transactionIdPrefix` does not enhance the deferral behavior — it replaces it entirely with Kafka's own transaction protocol. The simple `afterCommit()` deferral is the default behavior for a non-transactional producer.
 
 ```
-Chained commit order:
+No transaction-id-prefix set:
+  DB tx active → KafkaTemplate defers send to afterCommit() ✓
 
-  [DB commit] → [Kafka commit]
-                      ↑
-               crash here? DB committed, Kafka did not. Still inconsistent.
+transaction-id-prefix set:
+  DB tx active → KafkaTemplate uses Kafka producer transactions instead
+               → deferral behavior gone, Kafka tx commits independently of DB ✗
 ```
 
-**4. The deferral only applies when `@Transactional` uses a DB transaction manager**
+If you've set `transactionIdPrefix` anywhere in your config for any reason, you've silently opted out of the behavior you actually wanted.
 
-If you mix transaction managers, use `@Transactional` without specifying a `transactionManager`, or call `send()` outside a transaction boundary, the behavior silently changes. It's hard to tell from reading the code whether deferral is actually happening.
+**2. Spring's transaction synchronization infrastructure must be active**
 
-### The actual gap
+The deferral only works if `TransactionSynchronizationManager.isSynchronizationActive()` is true — which requires an active `DataSourceTransactionManager` or `JpaTransactionManager` transaction. Calling `send()` outside a `@Transactional` boundary, or within a transaction that doesn't activate synchronization, publishes immediately with no warning.
 
-Spring Kafka *can* do deferred-after-commit sending, but getting there requires configuring Kafka producer transactions as a side effect, understanding the interaction between multiple transaction managers, and trusting that the right conditions are all met at runtime.
+**3. A `KafkaTransactionManager` must not be in play**
 
-`TransactionalKafkaTemplate` does one thing explicitly: if a Spring transaction is active, buffer the record and publish it in `afterCommit()`. If there is no active transaction, publish immediately. No Kafka transaction protocol. No broker-side configuration. No silent fallback.
+If you have both a `DataSourceTransactionManager` and a `KafkaTransactionManager` configured, the behavior depends on which is primary and how they interact. The deferral behavior does not apply when a `KafkaTransactionManager` is the active transaction manager.
+
+### The actual problem
+
+Each of these conditions fails silently. If `transactionIdPrefix` is set, or synchronization isn't active, or a `KafkaTransactionManager` takes precedence, `KafkaTemplate` publishes immediately with no error and no indication that the deferral you expected didn't happen. In a test environment these conditions are often met; in production with a fully wired Spring context, they may not be.
+
+`TransactionalKafkaTemplate` does one thing explicitly: if `TransactionSynchronizationManager.isSynchronizationActive()` is true, buffer the record and publish in `afterCommit()`. If not, publish immediately. No dependency on producer configuration. No interaction with `KafkaTransactionManager`. No silent fallback.
 
 ---
 
