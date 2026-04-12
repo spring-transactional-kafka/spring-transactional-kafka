@@ -6,17 +6,15 @@ Transaction-safe Kafka publishing for Spring applications.
 
 ## Why not just use KafkaTemplate?
 
-Spring's `KafkaTemplate` supports Kafka transactions natively via `executeInTransaction()` and `@Transactional` on the producer side. But Kafka transactions are not the same as database transactions — and that distinction matters.
-
-When you use Spring's built-in Kafka transactional support, you are coordinating **Kafka's own transaction protocol** (producer idempotence, atomic multi-partition writes). This is useful for Kafka-to-Kafka pipelines (consume → process → produce), but it does **not** coordinate with your database transaction.
+When you configure `KafkaTemplate` with `transactionIdPrefix` and a `KafkaTransactionManager`, sends are wrapped in **Kafka's own transaction protocol** — producer idempotence, atomic multi-partition writes. This is useful for Kafka-to-Kafka pipelines (consume → process → produce), but it does **not** coordinate with your database transaction.
 
 The result is a classic dual-write problem:
 
 ```java
-@Transactional
+@Transactional // KafkaTransactionManager
 public void placeOrder(Order order) {
-    orderRepository.save(order);         // DB write
-    kafkaTemplate.send("orders", order); // Kafka write — separate system
+    orderRepository.save(order);         // DB write — separate transaction
+    kafkaTemplate.send("orders", order); // Kafka write — commits independently
 }
 ```
 
@@ -72,7 +70,7 @@ Each of these conditions fails silently. If `transactionIdPrefix` is set, or syn
 
 ## What TransactionalKafkaTemplate does differently
 
-`TransactionalKafkaTemplate` solves the dual-write problem using the **transactional outbox pattern**. Instead of writing to Kafka directly, it hooks into Spring's `TransactionSynchronizationManager` and defers publishing until **after** the database transaction has successfully committed.
+`TransactionalKafkaTemplate` hooks into Spring's `TransactionSynchronizationManager` and defers publishing until **after** the database transaction has successfully committed. If the transaction rolls back, the send is discarded.
 
 ```
 TransactionalKafkaTemplate approach:
@@ -147,7 +145,7 @@ DB transaction:
 | | Spring KafkaTemplate | TransactionalKafkaTemplate | Durable Outbox |
 |---|---|---|---|
 | **Atomicity with DB** | No | Best-effort | Yes (atomic) |
-| **Survives app crash** | N/A | No | Yes |
+| **Survives app crash** | No | No | Yes |
 | **Schema changes needed** | No | No | Yes (`outbox_events` table) |
 | **Operational complexity** | Low | Low | Medium (relay process) |
 | **Delivery guarantee** | At-most-once | At-least-once (post-commit) | At-least-once |
@@ -155,8 +153,8 @@ DB transaction:
 
 ### When TransactionalKafkaTemplate is enough
 
-- Your application is unlikely to crash in the milliseconds between DB commit and the `afterCommit()` callback
-- Occasional missed events are acceptable (e.g. cache invalidation, non-critical notifications)
+- The `afterCommit()` callback fires synchronously in the same thread immediately after the DB commit — the failure window is local and orders of magnitude smaller than a general dual-write across two independent systems
+- Occasional missed events on process crash are acceptable (e.g. cache invalidation, non-critical notifications)
 - You want zero infrastructure overhead
 
 ### When to use the durable outbox
