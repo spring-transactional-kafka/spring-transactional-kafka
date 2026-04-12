@@ -23,6 +23,7 @@
 
     <modules>
         <module>spring-transactional-kafka-core</module>
+        <module>spring-transactional-kafka-starter</module>
     </modules>
 
     <properties>
@@ -40,6 +41,11 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springtxnkafka</groupId>
+                <artifactId>spring-transactional-kafka-core</artifactId>
+                <version>${project.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
