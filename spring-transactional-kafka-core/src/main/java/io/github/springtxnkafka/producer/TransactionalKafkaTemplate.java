@@ -1,5 +1,6 @@
 package io.github.springtxnkafka.producer;
 
+import io.github.springtxnkafka.outbox.model.OutboxMessage;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,6 @@ public class TransactionalKafkaTemplate<K, V> {
     public void send(String topic, K key, V value) {
         send(new ProducerRecord<>(topic, key, value));
     }
-
 
     public void send(ProducerRecord<K, V> record) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

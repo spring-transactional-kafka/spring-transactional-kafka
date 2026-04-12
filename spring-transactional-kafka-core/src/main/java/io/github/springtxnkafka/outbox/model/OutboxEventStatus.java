@@ -1,4 +1,4 @@
-package io.github.springtxnkafka.outbox;
+package io.github.springtxnkafka.outbox.model;
 
 public enum OutboxEventStatus {
     PENDING,
