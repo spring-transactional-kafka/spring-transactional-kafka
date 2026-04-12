@@ -5,19 +5,20 @@ import io.github.springtxnkafka.outbox.model.OutboxMessage;
 import io.github.springtxnkafka.outbox.repository.OutboxEventRepository;
 import io.github.springtxnkafka.outbox.serializer.OutboxPayloadSerializer;
 
-public class DefaultOutboxEventStager implements OutboxEventStager {
+import java.util.Objects;
 
+public class DefaultOutbox implements Outbox {
 
-    private OutboxEventRepository repository;
-    private OutboxPayloadSerializer serializer;
+    private final OutboxEventRepository repository;
+    private final OutboxPayloadSerializer serializer;
 
-    public DefaultOutboxEventStager(OutboxEventRepository repository, OutboxPayloadSerializer serializer) {
+    public DefaultOutbox(OutboxEventRepository repository, OutboxPayloadSerializer serializer) {
         this.repository = repository;
         this.serializer = serializer;
     }
 
     @Override
-    public void stage(OutboxMessage message) {
+    public void send(OutboxMessage message) {
         String serializedPayload = serializer.serialize(message.getPayload());
         OutboxEvent event = OutboxEvent.from(message, serializedPayload);
         repository.save(event);

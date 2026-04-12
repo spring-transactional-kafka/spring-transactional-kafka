@@ -1,6 +1,6 @@
 package io.github.springtxnkafka.outbox.model;
 
-import io.github.springtxnkafka.outbox.stager.OutboxEventStager;
+import io.github.springtxnkafka.outbox.stager.OutboxStager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  *     .build();
  * }</pre>
  *
- * @see OutboxEventStager
+ * @see OutboxStager
  */
 public class OutboxMessage {
 

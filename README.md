@@ -6,7 +6,7 @@ Guaranteed Kafka publishing for Spring applications — from simple transaction-
 
 ## The problem
 
-When you publish to Kafka inside a `@Transactional` method, the send happens immediately — before the DB transaction commits. If the transaction rolls back, the event has already been sent to Kafka. If the broker is unavailable after the DB commits, the event is lost.
+When you publish to Kafka inside a `@Transactional` method, by default (without Kafka transaction coordination) the send happens immediately — before the DB transaction commits. If the transaction rolls back, the event has already been sent to Kafka. If the broker is unavailable after the DB commits, the event is lost.
 
 ```java
 @Transactional
@@ -38,6 +38,13 @@ public void placeOrder(Order order) {
 
 No extra configuration. No Kafka transaction protocol. Works with any standard `KafkaTemplate`.
 
+> **Note:** Spring Kafka supports transactional producers (`transactionIdPrefix`) and coordination via `KafkaTransactionManager`. However:
+> - Kafka transactions only guarantee atomic writes within Kafka
+> - Coordinating Kafka with a database transaction requires multiple transaction managers and is not truly atomic
+> - Configuration is non-trivial and tightly coupled to Kafka's transaction protocol
+>
+> `TransactionalKafkaTemplate` instead uses Spring's transaction synchronization to defer publishing until after a successful DB commit, without requiring Kafka transactions.
+
 **Limitation:** if the application crashes between the DB commit and the `afterCommit()` callback, the send is lost.
 
 ---
@@ -50,7 +57,7 @@ For use cases where a lost event is not acceptable, this library implements the 
 @Transactional
 public void placeOrder(Order order) {
     orderRepository.save(order);
-    outboxEventStager.stage(
+    outbox.send(
         OutboxMessage.to("orders.placed")
             .key(order.getId().toString())
             .payload(order)
@@ -86,7 +93,7 @@ If the application crashes after the DB commits, the event is still in `outbox_e
 | **Survives app crash** | No | Yes |
 | **Schema changes needed** | No | Yes (`outbox_events` table) |
 | **Operational complexity** | Low | Medium (relay process) |
-| **Delivery guarantee** | At-least-once (post-commit) | At-least-once |
+| **Delivery guarantee** | Best-effort (at-least-once after commit, but may lose messages on crash) | At-least-once |
 | **Best for** | Cache invalidation, non-critical events | Payments, orders, audit trails |
 
 Start with `TransactionalKafkaTemplate` if you want zero infrastructure overhead and can tolerate a very small crash window. Move to the durable outbox when losing an event is not an option.

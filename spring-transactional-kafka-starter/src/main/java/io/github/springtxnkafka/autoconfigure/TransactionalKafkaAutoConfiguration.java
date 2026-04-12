@@ -16,5 +16,4 @@ public class TransactionalKafkaAutoConfiguration {
         return new TransactionalKafkaTemplate<>(kafkaTemplate);
     }
 
-
 }
