@@ -7,7 +7,8 @@ import java.util.List;
 public interface OutboxEventRepository {
 
     void save(OutboxEvent event);
-    List<OutboxEvent> findPending(int limit);
-//    List<OutboxEvent> findRetryable(int limit);
+    List<OutboxEvent> findPending();
+    void markPublished(OutboxEvent event);
+    void markFailed(OutboxEvent event);
 
 }

@@ -1,22 +1,9 @@
 package io.github.springtxnkafka.outbox.model;
 
-import io.github.springtxnkafka.outbox.stager.OutboxStager;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Represents a message to be staged for reliable delivery to Kafka.
- *
- * <p>Construct instances using the fluent builder API:
- * <pre>{@code
- * OutboxMessage.to("orders.placed")
- *     .key(order.getId().toString())
- *     .payload(order)
- *     .build();
- * }</pre>
- *
- * @see OutboxStager
- */
 public class OutboxMessage {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxMessage.class);

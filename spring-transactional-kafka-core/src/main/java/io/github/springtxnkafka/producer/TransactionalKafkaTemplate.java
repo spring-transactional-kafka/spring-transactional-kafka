@@ -1,6 +1,5 @@
 package io.github.springtxnkafka.producer;
 
-import io.github.springtxnkafka.outbox.model.OutboxMessage;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
