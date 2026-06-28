@@ -9,7 +9,6 @@ public class OutboxEvent {
     private final String payload;
     private OutboxEventStatus status;
 
-
     public OutboxEvent(Long id, String topic, String key, String payload, OutboxEventStatus status) {
         this.id = id;
         this.topic = topic;
@@ -26,7 +25,6 @@ public class OutboxEvent {
                 OutboxEventStatus.PENDING
         );
     }
-
 
     public Long getId() { return id; }
     public String getTopic() { return topic; }
